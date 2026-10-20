@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import Dataset,DataLoader
+from torch.utils.data import Dataset,DataLoader,ConcatDataset
 from pathlib import Path
 from torchvision import transforms
 import glob
@@ -59,18 +59,48 @@ class CustomDataset(Dataset):
 
 if __name__ == "__main__":
     DATA_DIR = Path("data")
-    FOLDER_PATH = DATA_DIR / "track_1"
-    csv_paths = glob.glob(str(FOLDER_PATH / "*.csv"))
-    dataset = CustomDataset(csv_paths,FOLDER_PATH)
-    image,label = dataset[0]
 
-    print(f"Image Shape: {image.shape}")
-    print(f"label: {label}")
+    TRACK1_DIR = DATA_DIR / "track_1"
+    FOLDER_PATH_TRACK1 = DATA_DIR / "IMG"
+    csv_paths_track1 = glob.glob(str(TRACK1_DIR / "*.csv"))
 
-    assert image.shape == (3,66,200)
-    assert image.dtype == torch.float32
+    TRACK2_DIR = DATA_DIR / "track_2"
+    FOLDER_PATH_TRACK2 = DATA_DIR / "IMG"
+    csv_paths_track2 = glob.glob(str(TRACK2_DIR / "*.csv"))
+
+    dataset_track1 = CustomDataset(csv_paths_track1,FOLDER_PATH_TRACK1)
+    dataset_track2 = CustomDataset(csv_paths_track2,FOLDER_PATH_TRACK2)
+
+    dataset = ConcatDataset([
+        dataset_track1,
+        dataset_track2
+    ])
+
+    print(f"Total Samples: {len(dataset)}")
+    dataloader = DataLoader(
+        dataset=dataset,
+        batch_size=32,
+        shuffle=True
+    )
+    images,labels = next(iter(dataloader))
+
+    print("Image batch shape:", images.shape)
+    print("Label batch shape:", labels.shape)
+    print("Image dtype:", images.dtype)
+    print("Label dtype:", labels.dtype)
 
 
+    assert images.shape == (32, 3, 66, 200)
+    assert labels.shape == (32,)
+    assert images.dtype == torch.float32
+    assert labels.dtype == torch.float32
+
+    assert torch.isfinite(images).all()
+    assert torch.isfinite(labels).all()
+    assert images.min() >= 0.0
+    assert images.max() <= 1.0
+
+    print("All DataLoader tests passed!")
 
     
     ## Debbugging code to check the CSV files and their contents
