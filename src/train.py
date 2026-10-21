@@ -18,6 +18,62 @@ def check_cuda_availability():
         print("GPU Not Found, Using CPU!")
 
 
+def training_one_epoch(model,train_loader,criterion,optimizer,device):
+    model.train()
+    running_loss = 0.0
+    progress_bar = tqdm(
+        train_loader,
+        desc = "training",
+        unit = "batch"
+    )
+    for images,labels in progress_bar:
+        images = images.to(device)
+        labels = labels.to(device).reshape(-1,1)
+        optimizer.zero_grad()
+
+        predictions = model(images)
+        loss = criterion(predictions,labels)
+        if not torch.isfinite(loss).item():
+            raise RuntimeError(
+                "Non-finite training loss detected!"
+            )
+        loss.backward()
+        optimizer.step()
+
+        running_loss += (loss.item() * images.size(0))
+        progress_bar.set_postfix(
+            loss = f"{loss.item():.4f}"
+        )
+    
+    epoch_loss = running_loss / len(train_loader.dataset)
+    return epoch_loss
+
+
+def validate_one_epoch(model,val_loader,criterion,device):
+    model.eval()
+    running_loss = 0.0
+    progress_bar = tqdm(
+        val_loader,
+        desc = "validation",
+        unit = "batch"
+    )
+    with torch.no_grad():
+        for images,labels in progress_bar:
+            images = images.to(device)
+            labels = labels.to(device).reshape(-1,1)
+            predictions = model(images)
+            loss = criterion(predictions,labels)
+            if not torch.isfinite(loss).item():
+                raise RuntimeError(
+                    "Non-finite validation loss detected!"
+                )
+            running_loss += (loss.item() * images.size(0))
+            progress_bar.set_postfix(
+                batch_loss = f"{loss.item():.4f}"
+            )
+    epoch_loss = running_loss/(len(val_loader.dataset))
+    return epoch_loss
+
 if __name__ == "__main__":
     BATCH_SIZE = 32
     EPOCHS = 16
@@ -27,6 +83,10 @@ if __name__ == "__main__":
     CHECKPOINT_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
     check_cuda_availability()
+    torch.manual_seed(RANDOM_SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(RANDOM_SEED)
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Selected Device: {device}")
 
@@ -44,12 +104,16 @@ if __name__ == "__main__":
     train_dataset,val_dataset = split_datasets()
     train_loader = DataLoader(
         train_dataset,
-        batch_size=32,
+        batch_size=BATCH_SIZE,
+        num_workers=0,
+        pin_memory=(device.type == 'cuda'),
         shuffle= True
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=32,
+        batch_size=BATCH_SIZE,
+        num_workers=0,
+        pin_memory=(device.type == 'cuda'),
         shuffle=False
     )
 
@@ -60,40 +124,23 @@ if __name__ == "__main__":
     )
     best_val_loss = float("inf")
     for epoch in range(EPOCHS):
-        model.train()
-        running_train_loss = 0.0
-        for images,labels in train_loader:
-            images = images.to(device = device)
-            labels = labels.to(device = device).reshape(-1,1)
-            optimizer.zero_grad()
-
-            prediction = model(images)
-            loss = criterion(prediction,labels)
-            
-            ## Back Propagatioj
-            loss.backward()
-            ## Update the Model Weights
-            optimizer.step()
-
-            running_train_loss += (loss.item() * images.size(0))
-        train_loss = running_train_loss/ (len(train_dataset))
-
-        model.eval()
-        running_val_loss = 0.0
-        with torch.no_grad():
-            for images,labels in val_loader:
-                images = images.to(device)
-                labels = labels.to(device).reshape(-1,1)
-                predictions = model(images)
-                loss = criterion(predictions,labels)
-
-                running_val_loss += (loss.item() * images.size(0))
-        val_loss = running_val_loss / (len(val_dataset))
-
+        train_loss = training_one_epoch(
+            model = model,
+            train_loader= train_loader,
+            criterion=criterion,
+            optimizer=optimizer,
+            device = device
+        )
+        val_loss =validate_one_epoch(\
+            model=model,
+            val_loader=val_loader,
+            criterion=criterion,
+            device=device
+        )
         print(
-            f"Epoch: [{epoch+1}/{EPOCHS}]"
-            f"Train Loss: {train_loss:.2f}"
-            f"Validation Loss: {val_loss:.2f}"
+            f"Epoch: [{epoch+1}/{EPOCHS}] Summary |"
+            f"Train Loss: {train_loss:.4f} |"
+            f"Validation Loss: {val_loss:.4f}"
         )
 
         if val_loss < best_val_loss:
@@ -102,7 +149,7 @@ if __name__ == "__main__":
                 {
                     "epoch": epoch + 1,
                     "model_state_dict": model.state_dict(),
-                    "optmizer_state_dict": optimizer.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
                     "train_loss": train_loss,
                     "val_loss": val_loss
                 },
