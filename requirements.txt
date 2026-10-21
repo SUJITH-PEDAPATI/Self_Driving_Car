@@ -5,3 +5,6 @@ torchvision
 torchaudio
 pandas
 matplotlib
+tqdm
+python-socketio
+python-engineio
