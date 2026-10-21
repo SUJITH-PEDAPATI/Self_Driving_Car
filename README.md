@@ -103,30 +103,63 @@ The main files developed so far are organized as follows. Adjust this tree if yo
 
 ```text
 SelfDrivingAI/
-├── data/
-│   ├── track_1/
-│   │   ├── driving_log.csv
-│   │   └── IMG/
-│   └── track_2/
-│       ├── driving_log.csv
-│       └── IMG/
-├── models/
-│   └── best_model.pth
+│
+├── data/                          # Recorded simulator driving data
+│
+├── docs/
+│   ├── images/                    # Evaluation and dataset visualizations
+│   │   ├── error-distribution.png
+│   │   ├── largest-prediction-errors.png
+│   │   ├── prediction-scatter.png
+│   │   ├── steering-categories.png
+│   │   └── steering-distribution.png
+│   │
+│   └── steering-category-counts.csv
+│
+├── models/                        # Saved trained model checkpoints
+│
 ├── src/
-│   ├── inspect_data.py
-│   ├── visualize_data.py
-│   ├── preprocess_image.py
-│   ├── dataset.py
-│   ├── split_data.py
-│   ├── model.py
-│   ├── train.py
-│   ├── evaluate.py
-│   ├── analyze_results.py
-│   └── drive.py
-├── pyproject.toml
-├── uv.lock
-└── README.md
+│   ├── tests/                     # Project tests
+│   ├── analyze_results.py         # Baseline comparison and metrics
+│   ├── check_environment.py       # Environment diagnostics
+│   ├── dataset.py                 # Custom PyTorch dataset
+│   ├── drive.py                   # Simulator inference and control
+│   ├── evaluate.py                # Model evaluation
+│   ├── inspect_data.py            # Dataset inspection
+│   ├── model.py                   # CNN steering model
+│   ├── preprocess_image.py        # Image preprocessing
+│   ├── split_data.py              # Training/validation split
+│   ├── train.py                   # Model training pipeline
+│   ├── visualize_all_plots.py     # Generate analysis plots
+│   ├── visualize_data.py          # Visualize dataset samples
+│   └── visualize_results.py       # Visualize model predictions/errors
+│
+├── .gitignore                     # Git exclusion rules
+├── .python-version                # Python version configuration
+├── pyproject.toml                 # Project metadata and dependencies
+├── README.md                      # Project documentation
+├── requirements.txt               # Dependency list
+└── uv.lock                        # Locked dependency versions
 ```
+
+### Key Components
+
+| Component | Responsibility |
+|---|---|
+| `dataset.py` | Loads camera images and steering labels |
+| `preprocess_image.py` | Converts, crops, resizes, and normalizes images |
+| `model.py` | Defines the CNN steering-regression architecture |
+| `split_data.py` | Creates training and validation subsets |
+| `train.py` | Trains the model and saves the best checkpoint |
+| `evaluate.py` | Computes validation metrics and compares predictions |
+| `analyze_results.py` | Analyzes prediction errors and baseline performance |
+| `drive.py` | Connects model inference to the simulator |
+| `visualize_data.py` | Displays recorded driving images |
+| `visualize_results.py` | Plots prediction accuracy and errors |
+| `visualize_all_plots.py` | Generates the project's visualization collection |
+| `check_environment.py` | Checks environment configuration |
+| `inspect_data.py` | Inspects dataset structure and statistics |
+
 
 **Data and checkpoint note:** `data/`, `models/best_model.pth`, and `uv.lock` may be created locally depending on your workflow. Avoid committing large raw datasets or model checkpoints unless you intend to distribute them.
 
@@ -368,27 +401,34 @@ The current client is configured for `http://127.0.0.1:4567`; change this only i
 
 **Caution:** Keep the initial test controlled and be ready to stop the simulation. Verify steering sign, scale, image preprocessing, and telemetry compatibility before allowing the car to move. The current throttle is set to `0.0`; driving behavior and successful autonomous operation remain to be validated.
 
-## 🧪 Evaluation Metrics
 
-For ground-truth steering \(y_i\) and predicted steering \(\hat{y}_i\):
+### Evaluation Metrics
 
-**Mean Squared Error**
+**Mean Squared Error (MSE)**
 
-\[
-\mathrm{MSE}=\frac{1}{N}\sum_{i=1}^{N}(y_i-\hat{y}_i)^2
-\]
+$$
+\mathrm{MSE} = \frac{1}{N}\sum_{i=1}^{N}(y_i-\hat{y}_i)^2
+$$
 
-**Mean Absolute Error**
+**Mean Absolute Error (MAE)**
 
-\[
-\mathrm{MAE}=\frac{1}{N}\sum_{i=1}^{N}|y_i-\hat{y}_i|
-\]
+$$
+\mathrm{MAE} = \frac{1}{N}\sum_{i=1}^{N}|y_i-\hat{y}_i|
+$$
 
-**Root Mean Squared Error**
+**Root Mean Squared Error (RMSE)**
 
-\[
-\mathrm{RMSE}=\sqrt{\mathrm{MSE}}
-\]
+$$
+\mathrm{RMSE} = \sqrt{\mathrm{MSE}}
+$$
+
+**Where:**
+- $N$ is the number of evaluated samples.
+- $y_i$ is the actual steering angle.
+- $\hat{y}_i$ is the predicted steering angle.
+
+**Interpretation:** Lower values indicate smaller prediction errors on the evaluated dataset. RMSE penalizes larger errors more heavily than MAE. Always interpret these metrics alongside prediction plots and evaluation on genuinely unseen recordings.
+
 
 Lower values indicate smaller errors on the evaluated dataset. Always interpret metrics alongside prediction plots and testing on genuinely unseen recordings.
 
